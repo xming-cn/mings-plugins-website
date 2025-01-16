@@ -122,7 +122,7 @@ async def route_donwload():
         return jsonify({'error': '没有权限下载该插件, 你可以联系小明购买'}), 403
     key = request.args.get('key')
     if key == None:
-        return 
+        return jsonify({'error': '需要制定一个有效的文件键'}), 500
     try:
         response = s3_client.get_object(Bucket=S3_BUCKET, Key=key)
         file_data = response['Body'].read()
@@ -142,4 +142,4 @@ async def route_root():
     return await render_template('index.html', files=files, session=session)
 
 if __name__ == '__main__':
-    app.run(debug=True, port=2000, host='0.0.0.0', use_reloader=True)
+    app.run(debug=True, port=80, host='0.0.0.0', use_reloader=True)
