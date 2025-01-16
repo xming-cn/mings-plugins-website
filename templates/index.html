@@ -84,11 +84,25 @@
                 try {
                     const response = await fetch(link.href);
                     if (response.ok) {
+                        // Get the filename from the Content-Disposition header if available
+                        const contentDisposition = response.headers.get('Content-Disposition');
+                        let filename = '';
+                        if (contentDisposition) {
+                            const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                            if (filenameMatch && filenameMatch[1]) {
+                                filename = filenameMatch[1].replace(/['"]/g, '');
+                            }
+                        }
+                        if (!filename) {
+                            filename = link.getAttribute('download') || 'download';
+                        }
+
                         const blob = await response.blob();
                         const url = window.URL.createObjectURL(blob);
                         const a = document.createElement('a');
+                        a.style.display = 'none';
                         a.href = url;
-                        a.download = link.getAttribute('download') || '';
+                        a.download = filename;
                         document.body.appendChild(a);
                         a.click();
                         window.URL.revokeObjectURL(url);
@@ -98,6 +112,7 @@
                         showToast(data.error, true);
                     }
                 } catch (error) {
+                    console.error('Download error:', error);
                     showToast('下载文件时发生错误', true);
                 }
             });

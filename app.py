@@ -112,8 +112,17 @@ def route_donwload():
     if not has_permission(session.get('user_email'), get_file_permission(request.args.get('key'))):
         return jsonify({'error': '没有权限下载该插件, 你可以联系小明购买'}), 403
     key = request.args.get('key')
-    response = s3_client.get_object(Bucket=S3_BUCKET, Key=key)
-    return send_file(response['Body'], download_name=key.split('/')[-1])
+    try:
+        response = s3_client.get_object(Bucket=S3_BUCKET, Key=key)
+        return send_file(
+            response['Body'],
+            download_name=key.split('/')[-1],
+            mimetype='application/octet-stream',
+            as_attachment=True
+        )
+    except Exception as e:
+        print(f"Download error: {e}")
+        return jsonify({'error': '下载文件时发生错误'}), 500
 
 @app.route('/')
 def route_root():
