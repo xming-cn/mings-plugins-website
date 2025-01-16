@@ -1,4 +1,4 @@
-from flask import Flask, render_template, send_file, request, session, redirect, url_for
+from flask import Flask, render_template, send_file, request, session, redirect, url_for, jsonify
 import time
 import boto3
 from botocore.exceptions import ClientError
@@ -56,7 +56,11 @@ def update_s3_objects():
         return
     update_time = time.time()
     
-    response = s3_client.list_objects_v2(Bucket=S3_BUCKET)
+    try:
+        response = s3_client.list_objects_v2(Bucket=S3_BUCKET)
+    except Exception as e:
+        print(e)
+        return
     if 'Contents' in response:
         files = [
             {
@@ -104,9 +108,9 @@ def logout():
 @app.route('/download')
 def route_donwload():
     if not session.get('logged_in'):
-        return redirect(url_for('route_login'))
+        return jsonify({'error': '请先登录'}), 401
     if not has_permission(session.get('user_email'), get_file_permission(request.args.get('key'))):
-        return redirect(url_for('route_root'))
+        return jsonify({'error': '没有权限下载该插件, 你可以联系小明购买'}), 403
     key = request.args.get('key')
     response = s3_client.get_object(Bucket=S3_BUCKET, Key=key)
     return send_file(response['Body'], download_name=key.split('/')[-1])
