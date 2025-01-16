@@ -1,10 +1,5 @@
 import boto3
-import hashlib
 import sys
-from botocore.exceptions import ClientError
-
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
 
 def generate_password(length=12):
     import random
@@ -24,7 +19,7 @@ def add_user(username, password, permissions=None):
     
     item = {
         'username': username,
-        'password': hash_password(password)
+        'password': password
     }
     if permissions:
         item['permission'] = permissions
@@ -37,6 +32,8 @@ def add_user(username, password, permissions=None):
     print('username', username)
     print('password', password)
     print()
+    with open('accounts.txt', 'a') as f:
+        f.write(f'{username},{password}\n')
     return True
 
 if __name__ == '__main__':

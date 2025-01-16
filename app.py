@@ -2,11 +2,11 @@ from flask import Flask, render_template, send_file, request, session, redirect,
 import time
 import boto3
 from botocore.exceptions import ClientError
-import hashlib
 
 S3_BUCKET = "mings-plugins"
 
 app = Flask(__name__)
+app.secret_key = 'your-super-secret-key-here'
 s3_client = boto3.client("s3")
 
 dynamodb = boto3.resource('dynamodb')
@@ -15,9 +15,6 @@ users_table = dynamodb.Table('users')
 @app.context_processor
 def inject_session():
     return dict(session=session)
-
-def hash_password(password):
-    return hashlib.sha256(password.encode()).hexdigest()
 
 def file_size_format(size):
     units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
@@ -90,7 +87,7 @@ def login():
         )
         if 'Item' in response:
             stored_password = response['Item']['password']
-            if stored_password == hash_password(password):
+            if stored_password == password:
                 session['logged_in'] = True
                 session['user_email'] = username
                 return redirect(url_for('route_root'))
@@ -122,4 +119,4 @@ def route_root():
     return render_template('index.html', files=files, session=session)
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+    app.run(debug=True, port=80, host='0.0.0.0')
