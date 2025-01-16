@@ -28,7 +28,7 @@
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1>明府插件</h1>
             <div class="d-flex align-items-center">
-                <span class="me-3">当前用户 {% if session.get('user_email') %}{{ session.get('user_email') }}{% else %}未登录{% endif %}</span>
+                <span class="me-3">当前用户 {% if session.get('username') %}{{ session.get('username') }}{% else %}未登录{% endif %}</span>
                 {% if session.get('logged_in') %}
                     <a href="/logout" class="btn btn-outline-danger">退出登录</a>
                 {% else %}
