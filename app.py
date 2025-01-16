@@ -1,7 +1,8 @@
-from flask import Flask, render_template, send_file, request, session, redirect, url_for, jsonify
 import time
 import boto3
+from io import BytesIO
 from botocore.exceptions import ClientError
+from flask import Flask, render_template, send_file, request, session, redirect, url_for, jsonify
 
 S3_BUCKET = "mings-plugins"
 
@@ -114,8 +115,9 @@ def route_donwload():
     key = request.args.get('key')
     try:
         response = s3_client.get_object(Bucket=S3_BUCKET, Key=key)
+        file_data = response['Body'].read()
         return send_file(
-            response['Body'],
+            BytesIO(file_data),
             download_name=key.split('/')[-1],
             mimetype='application/octet-stream',
             as_attachment=True
