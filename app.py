@@ -42,7 +42,7 @@ async def has_permission(username: str, permission: str):
                 TableName='users',
                 KeyConditionExpression='username = :username',
                 ExpressionAttributeValues={
-                    ':username': username
+                    ':username': {'S': username}
                 }
             )
         if 'Items' not in response:
@@ -111,7 +111,7 @@ async def login():
                 TableName='users',
                 KeyConditionExpression='username = :username',
                 ExpressionAttributeValues={
-                    ':username': username
+                    ':username': {'S': username}
                 }
             )
         if 'Items' in response:
