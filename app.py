@@ -1,17 +1,15 @@
 import time
-import boto3
+import asyncio
+import aioboto3
 from io import BytesIO
 from botocore.exceptions import ClientError
 from quart import Quart, render_template, send_file, request, session, redirect, url_for, jsonify
 
 S3_BUCKET = "mings-plugins"
 
-app = Quart(__name__)
-app.secret_key = 'your-super-secret-key-here'
-s3_client = boto3.client("s3")
+aio_session = aioboto3.Session()
 
-dynamodb = boto3.resource('dynamodb')
-users_table = dynamodb.Table('users')
+app = Quart(__name__)
 
 @app.context_processor
 async def inject_session():
@@ -39,22 +37,37 @@ async def has_permission(username: str, permission: str):
     if not username:
         return False
     try:
-        response = users_table.get_item(
-            Key={
-                'username': username
-            }
-        )
-        if 'Item' not in response:
+        async with aio_session.client('dynamodb') as dynamodb_client:
+            response = await dynamodb_client.query(
+                TableName='users',
+                KeyConditionExpression='username = :username',
+                ExpressionAttributeValues={
+                    ':username': username
+                }
+            )
+        if 'Items' not in response:
             return False
-        if 'permission' not in response['Item']:
+        if 'permission' not in response['Items'][0]:
             return False
-        user_permissions = response['Item'].get('permission', '')
+        user_permissions = response['Items'][0].get('permission', '')
+        print('user_permissions: ' + user_permissions)
         return permission in user_permissions
     except:
         return False
 
 files = []
 update_time = None
+
+async def init():
+    global files, update_time
+    app.secret_key = await get_secret_key()
+    await update_s3_objects()
+
+async def get_secret_key():
+    secret_name = '/ming-plugins-website/secret_key'
+    async with aio_session.client('ssm') as ssm_client:
+        response = await ssm_client.get_parameter(Name=secret_name, WithDecryption=True)
+    return response['Parameter']['Value']
 
 async def update_s3_objects():
     global files, update_time
@@ -63,7 +76,8 @@ async def update_s3_objects():
     update_time = time.time()
     
     try:
-        response = s3_client.list_objects_v2(Bucket=S3_BUCKET)
+        async with aio_session.client('s3') as s3_client:
+            response = await s3_client.list_objects_v2(Bucket=S3_BUCKET)
     except Exception as e:
         print(e)
         return
@@ -92,13 +106,16 @@ async def login():
     password = form.get('password')
     
     try:
-        response = users_table.get_item(
-            Key={
-                'username': username
-            }
-        )
-        if 'Item' in response:
-            stored_password = response['Item']['password']
+        async with aio_session.client('dynamodb') as dynamodb_client:
+            response = await dynamodb_client.query(
+                TableName='users',
+                KeyConditionExpression='username = :username',
+                ExpressionAttributeValues={
+                    ':username': username
+                }
+            )
+        if 'Items' in response:
+            stored_password = response['Items'][0]['password']['S']
             if stored_password == password:
                 session['logged_in'] = True
                 session['username'] = username
@@ -122,10 +139,11 @@ async def route_donwload():
         return jsonify({'error': '没有权限下载该插件, 你可以联系小明购买'}), 403
     key = request.args.get('key')
     if key == None:
-        return jsonify({'error': '需要制定一个有效的文件键'}), 500
+        return jsonify({'error': '需要指定一个有效的文件键'}), 500
     try:
-        response = s3_client.get_object(Bucket=S3_BUCKET, Key=key)
-        file_data = response['Body'].read()
+        async with aio_session.client('s3') as s3_client:
+            response = await s3_client.get_object(Bucket=S3_BUCKET, Key=key)
+        file_data = await response['Body'].read()
         return await send_file(
             BytesIO(file_data),
             mimetype='application/octet-stream',
@@ -141,5 +159,16 @@ async def route_root():
     await update_s3_objects()
     return await render_template('index.html', files=files, session=session)
 
+async def main():
+    print('init')
+    await init()
+    print('update_s3_objects')
+    await update_s3_objects()
+    print('app.run')
+    server = app.run_task(host='0.0.0.0', port=80)
+    asyncio.create_task(server)
+    while True:
+        await asyncio.sleep(0.1)
+
 if __name__ == '__main__':
-    app.run(debug=True, port=80, host='0.0.0.0', use_reloader=True)
+    asyncio.run(main())
